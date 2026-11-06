@@ -17,48 +17,7 @@ jobs:
 
       - name: Apply 30-FPS Limit and Efficiency Patch
         run: |
-          cat << 'EOF' > patch.py
-import os
-
-# Path to the core file that handles video streams
-path = 'PipePipeExtractor/extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamInfo.java'
-with open(path, 'r') as f:
-    content = f.read()
-
-# Normalize line endings to ensure the patch works perfectly
-content = content.replace('\r\n', '\n')
-
-# The Magic Patch: Forces the app to reject any video stream over 30 FPS
-patch_v = """    public void setVideoStreams(final List<VideoStream> videoStreams) {
-        if (videoStreams != null) {
-            java.util.List<VideoStream> filtered = new java.util.ArrayList<>();
-            for (VideoStream s : videoStreams) {
-                if (s != null && s.getFps() <= 30) filtered.add(s);
-            }
-            this.videoStreams = filtered;
-        } else {
-            this.videoStreams = null;
-        }
-    }"""
-content = content.replace('    public void setVideoStreams(final List<VideoStream> videoStreams) {\n        this.videoStreams = videoStreams;\n    }', patch_v)
-
-# The Magic Patch: Forces the app to reject "video-only" 60 FPS streams as well
-patch_vo = """    public void setVideoOnlyStreams(final List<VideoStream> videoOnlyStreams) {
-        if (videoOnlyStreams != null) {
-            java.util.List<VideoStream> filtered = new java.util.ArrayList<>();
-            for (VideoStream s : videoOnlyStreams) {
-                if (s != null && s.getFps() <= 30) filtered.add(s);
-            }
-            this.videoOnlyStreams = filtered;
-        } else {
-            this.videoOnlyStreams = null;
-        }
-    }"""
-content = content.replace('    public void setVideoOnlyStreams(final List<VideoStream> videoOnlyStreams) {\n        this.videoOnlyStreams = videoOnlyStreams;\n    }', patch_vo)
-
-with open(path, 'w') as f:
-    f.write(content)
-EOF
+          echo "aW1wb3J0IG9zCgpwYXRoID0gJ1BpcGVQaXBlRXh0cmFjdG9yL2V4dHJhY3Rvci9zcmMvbWFpbi9qYXZhL29yZy9zY2hhYmkvbmV3cGlwZS9leHRyYWN0b3Ivc3RyZWFtL1N0cmVhbUluZm8uamF2YScKd2l0aCBvcGVuKHBhdGgsICdyJykgYXMgZjoKICAgIGNvbnRlbnQgPSBmLnJlYWQoKQoKY29udGVudCA9IGNvbnRlbnQucmVwbGFjZSgnXHJcbicsICdcbicpCgpwYXRjaF92ID0gJyAgICBwdWJsaWMgdm9pZCBzZXRWaWRlb1N0cmVhbXMoZmluYWwgTGlzdDxWaWRlb1N0cmVhbT4gdmlkZW9TdHJlYW1zKSB7XG4gICAgICAgIGlmICh2aWRlb1N0cmVhbXMgIT0gbnVsbCkge1xuICAgICAgICAgICAgamF2YS51dGlsLkxpc3Q8VmlkZW9TdHJlYW0+IGZpbHRlcmVkID0gbmV3IGphdmEudXRpbC5BcnJheUxpc3Q8PigpO1xuICAgICAgICAgICAgZm9yIChWaWRlb1N0cmVhbSBzIDogdmlkZW9TdHJlYW1zKSB7XG4gICAgICAgICAgICAgICAgaWYgKHMgIT0gbnVsbCAmJiBzLmdldEZwcygpIDw9IDMwKSBmaWx0ZXJlZC5hZGQocyk7XG4gICAgICAgICAgICB9XG4gICAgICAgICAgICB0aGlzLnZpZGVvU3RyZWFtcyA9IGZpbHRlcmVkO1xuICAgICAgICB9IGVsc2Uge1xuICAgICAgICAgICAgdGhpcy52aWRlb1N0cmVhbXMgPSBudWxsO1xuICAgICAgICB9XG4gICAgfScKY29udGVudCA9IGNvbnRlbnQucmVwbGFjZSgnICAgIHB1YmxpYyB2b2lkIHNldFZpZGVvU3RyZWFtcyhmaW5hbCBMaXN0PFZpZGVvU3RyZWFtPiB2aWRlb1N0cmVhbXMpIHtcbiAgICAgICAgdGhpcy52aWRlb1N0cmVhbXMgPSB2aWRlb1N0cmVhbXM7XG4gICAgfScsIHBhdGNoX3YpCgpwYXRjaF92byA9ICcgICAgcHVibGljIHZvaWQgc2V0VmlkZW9Pbmx5U3RyZWFtcyhmaW5hbCBMaXN0PFZpZGVvU3RyZWFtPiB2aWRlb09ubHlTdHJlYW1zKSB7XG4gICAgICAgIGlmICh2aWRlb09ubHlTdHJlYW1zICE9IG51bGwpIHtcbiAgICAgICAgICAgIGphdmEudXRpbC5MaXN0PFZpZGVvU3RyZWFtPiBmaWx0ZXJlZCA9IG5ldyBqYXZhLnV0aWwuQXJyYXlMaXN0PD4oKTtcbiAgICAgICAgICAgIGZvciAoVmlkZW9TdHJlYW0gcyA6IHZpZGVvT25seVN0cmVhbXMpIHtcbiAgICAgICAgICAgICAgICBpZiAocyAhPSBudWxsICYmIHMuZ2V0RnBzKCkgPD0gMzApIGZpbHRlcmVkLmFkZChzKTtcbiAgICAgICAgICAgIH1cbiAgICAgICAgICAgIHRoaXMudmlkZW9Pbmx5U3RyZWFtcyA9IGZpbHRlcmVkO1xuICAgICAgICB9IGVsc2Uge1xuICAgICAgICAgICAgdGhpcy52aWRlb09ubHlTdHJlYW1zID0gbnVsbDtcbiAgICAgICAgfVxuICAgIH0nCmNvbnRlbnQgPSBjb250ZW50LnJlcGxhY2UoJyAgICBwdWJsaWMgdm9pZCBzZXRWaWRlb09ubHlTdHJlYW1zKGZpbmFsIExpc3Q8VmlkZW9TdHJlYW0+IHZpZGVvT25seVN0cmVhbXMpIHtcbiAgICAgICAgdGhpcy52aWRlb09ubHlTdHJlYW1zID0gdmlkZW9Pbmx5U3RyZWFtcztcbiAgICB9JywgcGF0Y2hfdm8pCgp3aXRoIG9wZW4ocGF0aCwgJ3cnKSBhcyBmOgogICAgZi53cml0ZShjb250ZW50KQoKcHJpbnQoIlBhdGNoIGFwcGxpZWQgc3VjY2Vzc2Z1bGx5ISIpCg==" | base64 -d > patch.py
           python3 patch.py
 
       - name: Set up JDK 21
