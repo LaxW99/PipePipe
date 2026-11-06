@@ -1,0 +1,80 @@
+name: Build PipePipe Lite
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Fork and Submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Apply 30-FPS Limit and Efficiency Patch
+        run: |
+          cat << 'EOF' > patch.py
+import os
+
+# Path to the core file that handles video streams
+path = 'PipePipeExtractor/extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamInfo.java'
+with open(path, 'r') as f:
+    content = f.read()
+
+# Normalize line endings to ensure the patch works perfectly
+content = content.replace('\r\n', '\n')
+
+# The Magic Patch: Forces the app to reject any video stream over 30 FPS
+patch_v = """    public void setVideoStreams(final List<VideoStream> videoStreams) {
+        if (videoStreams != null) {
+            java.util.List<VideoStream> filtered = new java.util.ArrayList<>();
+            for (VideoStream s : videoStreams) {
+                if (s != null && s.getFps() <= 30) filtered.add(s);
+            }
+            this.videoStreams = filtered;
+        } else {
+            this.videoStreams = null;
+        }
+    }"""
+content = content.replace('    public void setVideoStreams(final List<VideoStream> videoStreams) {\n        this.videoStreams = videoStreams;\n    }', patch_v)
+
+# The Magic Patch: Forces the app to reject "video-only" 60 FPS streams as well
+patch_vo = """    public void setVideoOnlyStreams(final List<VideoStream> videoOnlyStreams) {
+        if (videoOnlyStreams != null) {
+            java.util.List<VideoStream> filtered = new java.util.ArrayList<>();
+            for (VideoStream s : videoOnlyStreams) {
+                if (s != null && s.getFps() <= 30) filtered.add(s);
+            }
+            this.videoOnlyStreams = filtered;
+        } else {
+            this.videoOnlyStreams = null;
+        }
+    }"""
+content = content.replace('    public void setVideoOnlyStreams(final List<VideoStream> videoOnlyStreams) {\n        this.videoOnlyStreams = videoOnlyStreams;\n    }', patch_vo)
+
+with open(path, 'w') as f:
+    f.write(content)
+EOF
+          python3 patch.py
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Build Debug APK
+        run: |
+          cd PipePipeClient
+          ./gradlew assembleDebug --stacktrace -DskipFormatKtlint
+
+      - name: Upload Final APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PipePipe-Lite-APK
+          path: PipePipeClient/app/build/outputs/apk/debug/*.apk
